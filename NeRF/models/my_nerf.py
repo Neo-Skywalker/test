@@ -53,21 +53,22 @@ class MyNeRF():
         #     json.dump({'sigma':self.volumes_sigma[:,:,:,0].tolist(),'color':self.volumes_color.tolist()},f)
         # sys.exit()
     def query(self, pts_xyz):
+        pass
         # print(f'Num:{Num}')
         #TODO：在my_renderer.py中被调用
         ###以下为未优化的代码
-        N, _ = pts_xyz.shape
-        sigma = torch.zeros(N, 1, device=pts_xyz.device)
-        color = torch.zeros(N, 3, device=pts_xyz.device)
-        self.volumes_sigma = self.volumes_sigma.to(pts_xyz.device)
-        self.volumes_color = self.volumes_color.to(pts_xyz.device)
-        X_index = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long() # 判断属于哪个体素（由于save是均匀划分，所以每个坐标就代表了那个体素中心）
-        Y_index = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long()
-        Z_index = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long()
-        # print(X_index.device, self.volumes_sigma.device)
-        sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
-        color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
-        return sigma, color
+        # N, _ = pts_xyz.shape
+        # sigma = torch.zeros(N, 1, device=pts_xyz.device)
+        # color = torch.zeros(N, 3, device=pts_xyz.device)
+        # self.volumes_sigma = self.volumes_sigma.to(pts_xyz.device)
+        # self.volumes_color = self.volumes_color.to(pts_xyz.device)
+        # X_index = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long() # 判断属于哪个体素（由于save是均匀划分，所以每个坐标就代表了那个体素中心）
+        # Y_index = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long()
+        # Z_index = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long()
+        # # print(X_index.device, self.volumes_sigma.device)
+        # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
+        # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
+        # return sigma, color
 
         ###先在高精度体素查找
         # N, _ = pts_xyz.shape
@@ -95,6 +96,6 @@ class MyNeRF():
         #         sigma[i,0] = self.volumes_sigma[X_index_course[i], Y_index_course[i], Z_index_course[i]]
         #         color[i,:] = self.volumes_color[X_index_course[i], Y_index_course[i], Z_index_course[i]]
         #     print(f'{i} finished')
-        # return sigma, color        
+        # return sigma, color
 
 
