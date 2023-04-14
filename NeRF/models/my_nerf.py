@@ -51,14 +51,12 @@ class MyNeRF():
         dim4 = torch.arange(1)
         mesh = torch.meshgrid(dim1,dim2,dim3,dim4)
         my_dim4 = torch.arange(1)
-        self.sigma_top128_xyz_coor = self.volumes_sigma[mesh[0],mesh[1],self.sigma_top128_z_coor,my_dim4]
-        print(f'No error, top128 shape:{self.sigma_top128_xyz_coor.shape}')
-        sys.exit()
+        self.sigma_top128_value = self.volumes_sigma[mesh[0],mesh[1],self.sigma_top128_z_coor,my_dim4]
         #然后把其他地方的高精度体素数据转化为低精度：
         if Num // 128 > 1:
-            MAG = Num // 128
-            self.volumes_sigma = self.volumes_sigma[0::MAG,0::MAG,0::MAG,:]
-            self.volumes_color = self.volumes_color[0::MAG,0::MAG,0::MAG,:]
+            self.MAG = Num // 128
+            self.volumes_sigma = self.volumes_sigma[0::self.MAG,0::self.MAG,0::self.MAG,:]
+            self.volumes_color = self.volumes_color[0::self.MAG,0::self.MAG,0::self.MAG,:]
         # self.my_sigma = sigma.reshape(Num ** 3)
         # with open('my_sigma.json','w') as f:
         #     json.dump({'sigma':self.volumes_sigma[:,:,:,0].tolist(),'color':self.volumes_color.tolist()},f)
@@ -68,45 +66,45 @@ class MyNeRF():
         # print(f'Num:{Num}')
         #TODO：在my_renderer.py中被调用
         ###以下为未优化的代码
-        N, _ = pts_xyz.shape
-        sigma = torch.zeros(N, 1, device=pts_xyz.device)
-        color = torch.zeros(N, 3, device=pts_xyz.device)
-        self.volumes_sigma = self.volumes_sigma.to(pts_xyz.device)
-        self.volumes_color = self.volumes_color.to(pts_xyz.device)
-        X_index = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long() # 判断属于哪个体素（由于save是均匀划分，所以每个坐标就代表了那个体素中心）
-        Y_index = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long()
-        Z_index = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long()
-        # print(X_index.device, self.volumes_sigma.device)
-        sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
-        color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
-        return sigma, color
-
-        ###先在高精度体素查找
         # N, _ = pts_xyz.shape
         # sigma = torch.zeros(N, 1, device=pts_xyz.device)
         # color = torch.zeros(N, 3, device=pts_xyz.device)
         # self.volumes_sigma = self.volumes_sigma.to(pts_xyz.device)
         # self.volumes_color = self.volumes_color.to(pts_xyz.device)
-        # X_index_fine = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long() # 高精度体素的绝对坐标->数组坐标
-        # Y_index_fine = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long()
-        # Z_index_fine = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long()
-        # X_index_course = ((pts_xyz[:, 0] + 0.125) * 4 * 128).clamp(0, 128-1).long() # 高精度体素的绝对坐标->数组坐标
-        # Y_index_course = ((pts_xyz[:, 1] - 0.75) * 4 * 128).clamp(0, 128-1).long()
-        # Z_index_course = ((pts_xyz[:, 2] + 0.125) * 4 * 128).clamp(0, 128-1).long()
+        # X_index = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long() # 判断属于哪个体素（由于save是均匀划分，所以每个坐标就代表了那个体素中心）
+        # Y_index = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long()
+        # Z_index = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long()
         # # print(X_index.device, self.volumes_sigma.device)
-        # # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
-        # # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
-        # print(f'N = {N}')
-        
-        # for i in range(N):
-        #     xyz_str = f'{X_index_fine[i]} {Y_index_fine[i]} {Z_index_fine[i]}'
-        #     if xyz_str in self.fine_coor_sigma_color:
-        #         sigma[i,0] = self.fine_coor_sigma_color[xyz_str][0]
-        #         color[i,:] = self.fine_coor_sigma_color[xyz_str][1]
-        #     else:
-        #         sigma[i,0] = self.volumes_sigma[X_index_course[i], Y_index_course[i], Z_index_course[i]]
-        #         color[i,:] = self.volumes_color[X_index_course[i], Y_index_course[i], Z_index_course[i]]
-        #     print(f'{i} finished')
+        # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
+        # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
         # return sigma, color
+
+        ###先在高精度体素查找
+        N, _ = pts_xyz.shape
+        sigma = torch.zeros(N, 1, device=pts_xyz.device)
+        color = torch.zeros(N, 3, device=pts_xyz.device)
+        self.volumes_sigma = self.volumes_sigma.to(pts_xyz.device)
+        self.volumes_color = self.volumes_color.to(pts_xyz.device)
+        X_index_fine = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long() # 高精度体素的绝对坐标->数组坐标
+        Y_index_fine = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long()
+        Z_index_fine = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long()
+        X_index_course = ((pts_xyz[:, 0] + 0.125) * 4 * 128).clamp(0, 128-1).long() # 高精度体素的绝对坐标->数组坐标
+        Y_index_course = ((pts_xyz[:, 1] - 0.75) * 4 * 128).clamp(0, 128-1).long()
+        Z_index_course = ((pts_xyz[:, 2] + 0.125) * 4 * 128).clamp(0, 128-1).long()
+        # print(X_index.device, self.volumes_sigma.device)
+        # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
+        # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
+        print(f'N = {N}')
+        
+        for i in range(N):
+            xyz_str = f'{X_index_fine[i]} {Y_index_fine[i]} {Z_index_fine[i]}'
+            if xyz_str in self.fine_coor_sigma_color:
+                sigma[i,0] = self.fine_coor_sigma_color[xyz_str][0]
+                color[i,:] = self.fine_coor_sigma_color[xyz_str][1]
+            else:
+                sigma[i,0] = self.volumes_sigma[X_index_course[i], Y_index_course[i], Z_index_course[i]]
+                color[i,:] = self.volumes_color[X_index_course[i], Y_index_course[i], Z_index_course[i]]
+            print(f'{i} finished')
+        return sigma, color
 
 
