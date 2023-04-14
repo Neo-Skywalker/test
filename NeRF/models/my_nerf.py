@@ -21,7 +21,9 @@ class MyNeRF():
         super(MyNeRF, self).__init__()
         self.volumes_sigma = torch.zeros((Num,Num,Num,1))
         self.volumes_color = torch.zeros((Num,Num,Num,3))
-        self.fine_coor_sigma_color = {}
+        self.z_sampling_num = min(Num,128) # 如果Num小于128，就没必要优化了
+        self.fine_sigma_coor = torch.zeros((Num,Num,self.z_sampling_num,3))
+        self.fine_color_coor = torch.zeros((Num,Num,self.z_sampling_num,1))
     def save(self, pts_xyz, sigma, color):
         # Num, _ = pts_xyz.shape
         # print(f'\n ptxyz shape{pts_xyz.shape}')
@@ -30,19 +32,28 @@ class MyNeRF():
         self.pts_xyz = pts_xyz.reshape((Num,Num,Num,3)) #前三位为数组坐标，最后一个3为绝对坐标
         self.volumes_sigma = sigma.reshape((Num,Num,Num,1))
         self.volumes_color = color.reshape((Num,Num,Num,3))
-        for i in range(Num): # 存下了物体表面附近的高精度体素
-            for j in range(Num):
-                sampling_target = self.volumes_sigma[i,j,:,0]
-                # good_sigma_num = np.sum((sampling_target > 0)==True)
-                # if good_sigma_num < 128:
-                #     b = np.where(sampling_target > 0)
-                # 先整理出最大的128个sigma对应的数组坐标，存取这些z坐标、sigma值
-                val, idx = torch.sort(sampling_target, descending=True) #descending为alse，升序，为True，降序
-                # self.fine_sigma[i,j,:,0] = val[0:128]
-                # self.fine_sigma_coor[i,j,:] = idx[0:128]
-                for k in range(min(Num,128)):
-                    self.fine_coor_sigma_color[f'{i} {j} {idx[k]}'] = (np.float64(val[k]),self.volumes_color[i,j,idx[k]])
-            print(f'{i} finished')
+        # for i in range(Num): # 存下了物体表面附近的高精度体素
+        #     for j in range(Num):
+        #         sampling_target = self.volumes_sigma[i,j,:,0]
+        #         # 先整理出最大的128个sigma对应的数组坐标，存取这些z坐标、sigma值
+        #         val, idx = torch.sort(sampling_target, descending=True) #descending为alse，升序，为True，降序
+        #         self.fine_sigma[i,j,:,0] = val[0:128]
+        #         self.fine_sigma_coor[i,j,:] = idx[0:128]
+        #         for k in range(min(Num,128)):
+        #             self.fine_coor_sigma_color[f'{i} {j} {idx[k]}'] = (np.float64(val[k]),self.volumes_color[i,j,idx[k]])
+        
+        self.sigma_sort_z_coor = torch.argsort(self.volumes_sigma,dim=-2,descending=True) # sort along Z-axis, shape:(Num,Num,Num,1)
+        self.sigma_top128_z_coor = self.sigma_sort_z_coor[:,:,0:self.z_sampling_num,:] # shape:(Num,Num,self.z_sampling_num,1)
+        # meshgridlize
+        dim1 = torch.arange(Num)
+        dim2 = torch.arange(Num)
+        dim3 = torch.arange(self.z_sampling_num)
+        dim4 = torch.arange(1)
+        mesh = torch.meshgrid(dim1,dim2,dim3,dim4)
+        my_dim4 = torch.arange(1)
+        self.sigma_top128_xyz_coor = self.volumes_sigma[mesh[0],mesh[1],self.sigma_top128_z_coor,my_dim4]
+        print(f'No error, top128 shape:{self.sigma_top128_xyz_coor.shape}')
+        sys.exit()
         #然后把其他地方的高精度体素数据转化为低精度：
         if Num // 128 > 1:
             MAG = Num // 128
