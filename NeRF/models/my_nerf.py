@@ -76,8 +76,6 @@ class MyNeRF():
         then the index must be the index of its sigma in self.sigma_top128_value! 
         '''
 
-
-
         #然后把其他地方的高精度体素数据转化为低精度：
         if Num // 128 > 1:
             self.MAG = Num // 128
@@ -121,7 +119,7 @@ class MyNeRF():
         # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
         # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
         print(f'N = {N}')
-
+        fine_coor_sigma = torch.sum((X_index_fine * Z_S_N**2,Y_index_fine * Z_S_N,Z_index_fine),dim=-1)
         return sigma, color
 
 
