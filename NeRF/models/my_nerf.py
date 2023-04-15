@@ -21,9 +21,9 @@ class MyNeRF():
         super(MyNeRF, self).__init__()
         self.volumes_sigma = torch.zeros((Num,Num,Num,1))
         self.volumes_color = torch.zeros((Num,Num,Num,3))
-        self.z_sampling_num = min(Num,128) # 如果Num小于128，就没必要优化了
-        self.fine_sigma_coor = torch.zeros((Num,Num,self.z_sampling_num,3))
-        self.fine_color_coor = torch.zeros((Num,Num,self.z_sampling_num,1))
+        # self.z_sampling_num = min(Num,128) # 如果Num小于128，就没必要优化了
+        self.fine_sigma_coor = torch.zeros((Num,Num,Z_S_N,1))
+        self.fine_color_coor = torch.zeros((Num,Num,Z_S_N,3))
     def save(self, pts_xyz, sigma, color):
         # Num, _ = pts_xyz.shape
         # print(f'\n ptxyz shape{pts_xyz.shape}')
@@ -43,15 +43,41 @@ class MyNeRF():
         #             self.fine_coor_sigma_color[f'{i} {j} {idx[k]}'] = (np.float64(val[k]),self.volumes_color[i,j,idx[k]])
         
         self.sigma_sort_z_coor = torch.argsort(self.volumes_sigma,dim=-2,descending=True) # sort along Z-axis, shape:(Num,Num,Num,1)
-        self.sigma_top128_z_coor = self.sigma_sort_z_coor[:,:,0:self.z_sampling_num,:] # shape:(Num,Num,self.z_sampling_num,1)
+        self.sigma_top128_z_coor = self.sigma_sort_z_coor[:,:,0:Z_S_N,:] # shape:(Num,Num,self.z_sampling_num,1)
+
+        # with open('my_sigma_top128.json','w') as f:
+        #     json.dump({'top128':self.sigma_top128_z_coor.tolist()},f)
+        # print('\ndone\n')
+        # sys.exit()
+
         # meshgridlize
         dim1 = torch.arange(Num)
         dim2 = torch.arange(Num)
-        dim3 = torch.arange(self.z_sampling_num)
+        dim3 = torch.arange(Z_S_N)
         dim4 = torch.arange(1)
         mesh = torch.meshgrid(dim1,dim2,dim3,dim4)
-        my_dim4 = torch.arange(1)
-        self.sigma_top128_value = self.volumes_sigma[mesh[0],mesh[1],self.sigma_top128_z_coor,my_dim4]
+        # my_dim4 = torch.arange(1)
+        self.sigma_top128_value = self.volumes_sigma[mesh[0],mesh[1],self.sigma_top128_z_coor,mesh[3]]
+        self.sigma_top128_coor = torch.sum(torch.cat((mesh[0] * Z_S_N**2,mesh[1] * Z_S_N,self.sigma_top128_z_coor),-1),dim=-1) 
+        # ↑shape[64,64,64] if RS=64,use hashcode,[64,64,64,-3]without outer torch.sum()
+        # with open('my_sigma_top128.json','w') as f:
+        #     json.dump({'top128':self.sigma_top128_coor.tolist()},f)
+        # print(f'\ndone\nsize:{self.sigma_top128_coor.shape}')
+        # sys.exit()
+        
+        '''
+        How to find whether pts_xyz's coor's tensor in self.sigma_top128_coor? pytorch has no such API.
+        maybe I should convert self.sigma_top128_coor -> hashcode, then shape will be[64,64,64,1](if RS=64)
+        when get in pts_xyz, I can change pts_xyz -> hashcode, 
+        if I assert certain pts_xyz in self.sigma_top128_coor, how to find its sigma and color? take sigma for exp.
+        In self.sigma_top128_value, I store top 128 sigma, but they loss their original coor,
+        which means the max sigma may be in coor[1,1,1,23], but now, it is[1,1,1,0]
+        I can find the index of pts_xyz's hashcode in self.sigma_top128_coor's hashcode,
+        then the index must be the index of its sigma in self.sigma_top128_value! 
+        '''
+
+
+
         #然后把其他地方的高精度体素数据转化为低精度：
         if Num // 128 > 1:
             self.MAG = Num // 128
@@ -95,16 +121,7 @@ class MyNeRF():
         # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
         # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
         print(f'N = {N}')
-        
-        for i in range(N):
-            xyz_str = f'{X_index_fine[i]} {Y_index_fine[i]} {Z_index_fine[i]}'
-            if xyz_str in self.fine_coor_sigma_color:
-                sigma[i,0] = self.fine_coor_sigma_color[xyz_str][0]
-                color[i,:] = self.fine_coor_sigma_color[xyz_str][1]
-            else:
-                sigma[i,0] = self.volumes_sigma[X_index_course[i], Y_index_course[i], Z_index_course[i]]
-                color[i,:] = self.volumes_color[X_index_course[i], Y_index_course[i], Z_index_course[i]]
-            print(f'{i} finished')
+
         return sigma, color
 
 
