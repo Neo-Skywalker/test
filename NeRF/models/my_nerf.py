@@ -59,11 +59,12 @@ class MyNeRF():
         # my_dim4 = torch.arange(1)
         self.sigma_top128_value = self.volumes_sigma[mesh[0],mesh[1],self.sigma_top128_z_coor,mesh[3]]
         self.sigma_top128_coor = torch.sum(torch.cat((mesh[0] * Z_S_N**2,mesh[1] * Z_S_N,self.sigma_top128_z_coor),-1),dim=-1) 
-        # ↑shape[64,64,64] if RS=64,use hashcode,[64,64,64,-3]without outer torch.sum()
-        # with open('my_sigma_top128.json','w') as f:
-        #     json.dump({'top128':self.sigma_top128_coor.tolist()},f)
-        # print(f'\ndone\nsize:{self.sigma_top128_coor.shape}')
-        # sys.exit()
+        # ↑shape[64,64,64] if RS=64,use hashcode,[64,64,64,3]without outer torch.sum()
+        
+        with open('my_sigma_top128.json','w') as f:
+            json.dump({'top128':self.sigma_top128_coor.tolist()},f)
+        print(f'\ndone\nsize:{self.sigma_top128_coor.shape}')
+        sys.exit()
         
         '''
         How to find whether pts_xyz's coor's tensor in self.sigma_top128_coor? pytorch has no such API.
@@ -119,7 +120,7 @@ class MyNeRF():
         # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
         # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
         print(f'N = {N}')
-        fine_coor_sigma = torch.sum((X_index_fine * Z_S_N**2,Y_index_fine * Z_S_N,Z_index_fine),dim=-1)
+        fine_coor_hash = torch.sum((X_index_fine * Z_S_N**2,Y_index_fine * Z_S_N,Z_index_fine),dim=-1)
         return sigma, color
 
 
