@@ -7,6 +7,7 @@ import time
 import sys
 import json
 from models.settings import *
+import time
 Num = MY_RS
 class CheatNeRF():
     def __init__(self, nerf):
@@ -60,9 +61,18 @@ class MyNeRF():
         self.sigma_top128_value = self.volumes_sigma[mesh[0],mesh[1],self.sigma_top128_z_coor,mesh[3]]
         self.sigma_top128_coor = torch.sum(torch.cat((mesh[0] * Z_S_N**2,mesh[1] * Z_S_N,self.sigma_top128_z_coor),-1),dim=-1) 
         # ↑shape[64,64,64] if RS=64,use hashcode,[64,64,64,3]without outer torch.sum()
+        self.sigma_top128_dic = {}
         
-        with open('my_sigma_top128.json','w') as f:
-            json.dump({'top128':self.sigma_top128_coor.tolist()},f)
+        print('\nbegin looping\n')
+        for i in range(Num):
+            for j in range(Num):
+                for k in range(Z_S_N):
+                    self.sigma_top128_dic[int(self.sigma_top128_coor[i,j,k])] = int(self.volumes_sigma[i,j,self.sigma_top128_z_coor[i,j,k,0],0])
+                    # self.sigma_top128_dic[self.sigma_top128_coor[0,0,0]] = 1
+            print(i)
+        print('\nend looping\n')
+        with open('my_sigma_top128_dict.json','w') as f:
+            json.dump(self.sigma_top128_dic,f)
         print(f'\ndone\nsize:{self.sigma_top128_coor.shape}')
         sys.exit()
         
@@ -87,7 +97,8 @@ class MyNeRF():
         #     json.dump({'sigma':self.volumes_sigma[:,:,:,0].tolist(),'color':self.volumes_color.tolist()},f)
         # sys.exit()
     def query(self, pts_xyz):
-        pass
+        with open('../NeRF/my_sigma_top128_dict.json') as f:
+            a = json.load(f)
         # print(f'Num:{Num}')
         #TODO：在my_renderer.py中被调用
         ###以下为未优化的代码
@@ -108,11 +119,11 @@ class MyNeRF():
         N, _ = pts_xyz.shape
         sigma = torch.zeros(N, 1, device=pts_xyz.device)
         color = torch.zeros(N, 3, device=pts_xyz.device)
-        self.volumes_sigma = self.volumes_sigma.to(pts_xyz.device)
-        self.volumes_color = self.volumes_color.to(pts_xyz.device)
-        X_index_fine = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long() # 高精度体素的绝对坐标->数组坐标
-        Y_index_fine = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long()
-        Z_index_fine = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long()
+        # self.volumes_sigma = self.volumes_sigma.to(pts_xyz.device)
+        # self.volumes_color = self.volumes_color.to(pts_xyz.device)
+        X_index_fine = ((pts_xyz[:, 0] + 0.125) * 4 * Num).clamp(0, Num-1).long().reshape(-1,1) # 高精度体素的绝对坐标->数组坐标
+        Y_index_fine = ((pts_xyz[:, 1] - 0.75) * 4 * Num).clamp(0, Num-1).long().reshape(-1,1)
+        Z_index_fine = ((pts_xyz[:, 2] + 0.125) * 4 * Num).clamp(0, Num-1).long().reshape(-1,1)
         X_index_course = ((pts_xyz[:, 0] + 0.125) * 4 * 128).clamp(0, 128-1).long() # 高精度体素的绝对坐标->数组坐标
         Y_index_course = ((pts_xyz[:, 1] - 0.75) * 4 * 128).clamp(0, 128-1).long()
         Z_index_course = ((pts_xyz[:, 2] + 0.125) * 4 * 128).clamp(0, 128-1).long()
@@ -120,7 +131,15 @@ class MyNeRF():
         # sigma[:, 0] = self.volumes_sigma[X_index, Y_index, Z_index].reshape(N)
         # color[:, :] = self.volumes_color[X_index, Y_index, Z_index].reshape(N,3)
         print(f'N = {N}')
-        fine_coor_hash = torch.sum((X_index_fine * Z_S_N**2,Y_index_fine * Z_S_N,Z_index_fine),dim=-1)
+        print(type(X_index_fine))
+        fine_coor_hash = torch.sum(torch.cat((X_index_fine * Z_S_N**2,Y_index_fine * Z_S_N,Z_index_fine),-1),dim=-1).tolist()
+        index = 0
+        time1=time.time()
+        for i in fine_coor_hash:
+            sigma[index,0] = a[str(i)]
+            index+=1
+        print(f'second:{time.time()-time1}')
+        sys.exit()
         return sigma, color
 
 

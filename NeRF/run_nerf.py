@@ -163,13 +163,13 @@ if __name__ == '__main__':
     runner = Runner(args.conf, args.mode, args.case, args.is_continue)
     
     # 老师的code
-    # if args.mode == 'render':
-    #     runner.save()
-    #     runner.render_video()
-    # elif args.mode == 'test':
-    #     runner.use_nerf()
-    #     runner.render_video()
+    if args.mode == 'render':
+        # runner.save()
+        runner.render_video()
+    elif args.mode == 'test':
+        runner.use_nerf()
+        runner.render_video()
 
     # my code
-    runner.save()
-    runner.render_video()
+    # runner.save()
+    # runner.render_video()
